@@ -26,76 +26,58 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Detectar retorno de redirección con access_token o id_token en el hash
+  // Inicializar Google Identity Services con el Client ID de .env
   useEffect(() => {
-    if (window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const idToken = hashParams.get('id_token');
-      if (accessToken || idToken) {
-        setLoading(true);
-        window.history.replaceState(null, '', window.location.pathname);
-        loginWithGoogle(accessToken ? { access_token: accessToken } : { id_token: idToken! })
-          .catch((err: any) => setError(err.message || 'Error al validar sesión con Google'))
-          .finally(() => setLoading(false));
-      }
-    }
-  }, [loginWithGoogle]);
+    if (!clientId) return;
 
-  const redirectToGoogleOAuth = () => {
-    const redirectUri = window.location.origin;
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&response_type=token&scope=${encodeURIComponent('openid email profile')}&prompt=select_account`;
-    window.location.href = authUrl;
-  };
+    let attempts = 0;
+    const maxAttempts = 20;
 
-  const handleGoogleLogin = () => {
-    if (!clientId) {
-      setError('No se ha configurado el Client ID de Google.');
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-
-    // Intentar con OAuth2 Token Client (abre popup nativo directo desde el evento click del usuario)
-    if (window.google?.accounts?.oauth2) {
-      try {
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'openid email profile',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse?.access_token) {
-              try {
-                await loginWithGoogle({ access_token: tokenResponse.access_token });
-              } catch (err: any) {
-                setError(err.message || 'Error al validar credencial con el servidor');
-              } finally {
-                setLoading(false);
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.google?.accounts?.id) {
+        clearInterval(interval);
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response: any) => {
+              if (response.credential) {
+                try {
+                  setLoading(true);
+                  setError(null);
+                  await loginWithGoogle(response.credential);
+                } catch (err: any) {
+                  setError(err.message || 'Error al validar credencial con Google');
+                } finally {
+                  setLoading(false);
+                }
               }
-            } else if (tokenResponse?.error) {
-              setError(`Google: ${tokenResponse.error_description || tokenResponse.error}`);
-              setLoading(false);
-            }
-          },
-          error_callback: (err: any) => {
-            console.error('[Google OAuth] Error callback:', err);
-            // Si el popup fue bloqueado por una extensión, usamos redirección directa
-            redirectToGoogleOAuth();
-          },
-        });
+            },
+          });
 
-        client.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (e) {
-        console.warn('Fallo initTokenClient, recurriendo a redirección:', e);
+          const btnEl = document.getElementById('google-btn-container');
+          if (btnEl) {
+            btnEl.innerHTML = '';
+            const computedWidth = Math.min(360, Math.max(220, window.innerWidth - 64));
+            window.google.accounts.id.renderButton(btnEl, {
+              theme: theme === 'dark' ? 'filled_blue' : 'outline',
+              size: 'large',
+              width: computedWidth,
+              text: 'continue_with',
+              shape: 'rectangular',
+              locale: 'es',
+            });
+          }
+        } catch (e) {
+          console.error('Error inicializando Google GIS:', e);
+        }
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
       }
-    }
+    }, 250);
 
-    // Fallback directo si el script de Google no cargó por AdBlock
-    redirectToGoogleOAuth();
-  };
+    return () => clearInterval(interval);
+  }, [clientId, theme]);
 
   return (
     <div
@@ -250,33 +232,31 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <div
+            id="google-btn-container"
             style={{
               display: 'flex',
               justifyContent: 'center',
+              minHeight: '46px',
               width: '100%',
             }}
           >
+            {/* Botón provisional mientras el SDK de Google monta el iframe */}
             <button
-              id="google-native-login-btn"
               className="btn btn-secondary"
               style={{
                 width: '100%',
-                padding: '13px 18px',
+                padding: '12px',
                 display: 'flex',
                 gap: '12px',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 600,
-                fontSize: '0.95rem',
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#ffffff',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-subtle)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
               }}
-              onClick={handleGoogleLogin}
+              onClick={() => {
+                if (window.google?.accounts?.id) {
+                  window.google.accounts.id.prompt();
+                }
+              }}
               disabled={loading}
             >
               <svg width="20" height="20" viewBox="0 0 24 24">
@@ -297,7 +277,7 @@ export const LoginPage: React.FC = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>{loading ? 'Iniciando sesión...' : 'Continuar con Google'}</span>
+              <span>{loading ? 'Validando con Google...' : 'Continuar con Google'}</span>
             </button>
           </div>
           <p
