@@ -40,17 +40,35 @@ export const LoginPage: React.FC = () => {
         try {
           window.google.accounts.id.initialize({
             client_id: clientId,
+            auto_select: false,
+            cancel_on_tap_outside: true,
             callback: async (response: any) => {
+              console.log('[Google GIS] Respuesta recibida:', response);
               if (response.credential) {
                 try {
                   setLoading(true);
                   setError(null);
                   await loginWithGoogle(response.credential);
                 } catch (err: any) {
-                  setError(err.message || 'Error al validar credencial con Google');
+                  console.error('[Google GIS] Error enviando al backend:', err);
+                  setError(err.message || 'Error al validar credencial con el servidor');
                 } finally {
                   setLoading(false);
                 }
+              } else {
+                setLoading(false);
+                setError('Google no devolvió credenciales válidas.');
+              }
+            },
+            error_callback: (err: any) => {
+              console.error('[Google GIS] Error callback:', err);
+              setLoading(false);
+              if (err?.type === 'popup_failed_to_open') {
+                setError('El navegador bloqueó la ventana emergente de Google. Permite las ventanas emergentes.');
+              } else if (err?.type === 'popup_closed') {
+                setError('Se cerró la ventana de Google antes de iniciar sesión.');
+              } else {
+                setError(`Error de Google (${err?.type || 'desconocido'}). Revisa los orígenes autorizados en Google Cloud Console.`);
               }
             },
           });
@@ -66,6 +84,22 @@ export const LoginPage: React.FC = () => {
               text: 'continue_with',
               shape: 'rectangular',
               locale: 'es',
+              click_listener: () => {
+                console.log('[Google GIS] Botón clickeado por el usuario');
+                setError(null);
+                setLoading(true);
+                // Si Google no responde en 8 segundos (ej: origen no autorizado silencioso)
+                setTimeout(() => {
+                  setLoading((curr) => {
+                    if (curr) {
+                      setError(
+                        'Google no respondió. Abre la consola (F12). La causa más común es que falta "http://localhost:5173" en los "Orígenes autorizados de JavaScript" en Google Cloud Console.'
+                      );
+                    }
+                    return false;
+                  });
+                }, 8000);
+              },
             });
           }
         } catch (e) {
@@ -280,6 +314,24 @@ export const LoginPage: React.FC = () => {
               <span>{loading ? 'Validando con Google...' : 'Continuar con Google'}</span>
             </button>
           </div>
+          {loading && (
+            <div
+              style={{
+                fontSize: '0.82rem',
+                color: 'var(--primary)',
+                textAlign: 'center',
+                marginTop: '10px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+              <span>Conectando con Google...</span>
+            </div>
+          )}
           <p
             style={{
               fontSize: '0.74rem',
