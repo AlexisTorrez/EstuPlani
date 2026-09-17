@@ -44,12 +44,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   // Auth
-  googleLogin: async (idToken: string) => {
+  googleLogin: async (credentials: string | { id_token?: string; access_token?: string }) => {
     // Al iniciar sesión real con Google, salimos de modo demo
     localStorage.removeItem('estuplani_demo_mode');
+    const payload = typeof credentials === 'string' ? { id_token: credentials } : credentials;
     return request<{ token: string; user: User }>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify(payload),
     });
   },
 

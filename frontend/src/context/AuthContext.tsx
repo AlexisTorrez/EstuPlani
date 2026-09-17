@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isDemo: boolean;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithGoogle: (credentials: string | { id_token?: string; access_token?: string }) => Promise<void>;
   enterDemoMode: () => void;
   logout: () => void;
 }
@@ -61,9 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
-  const loginWithGoogle = async (idToken: string) => {
+  const loginWithGoogle = async (credentials: string | { id_token?: string; access_token?: string }) => {
     localStorage.removeItem('estuplani_demo_mode');
-    const res = await api.googleLogin(idToken);
+    const res = await api.googleLogin(credentials);
     localStorage.setItem('estuplani_token', res.token);
     setUser(res.user);
     setIsDemo(false);

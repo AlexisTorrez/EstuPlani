@@ -7,7 +7,7 @@ use axum::{
 };
 use crate::{
     auth::{
-        google::{verify_google_token, AuthResponse, GoogleAuthRequest},
+        google::{verify_google_credentials, AuthResponse, GoogleAuthRequest},
         jwt::create_jwt,
         middleware::AuthUser,
     },
@@ -25,7 +25,7 @@ async fn google_login(
     State(state): State<AppState>,
     Json(payload): Json<GoogleAuthRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let token_info = verify_google_token(&payload.id_token, &state.config.google_client_id)
+    let token_info = verify_google_credentials(&payload, &state.config.google_client_id)
         .await
         .map_err(|e| (StatusCode::UNAUTHORIZED, e))?;
 
