@@ -50,8 +50,8 @@ git push origin main
    - **Name**: `estuplani-backend` (o el nombre que prefieras).
    - **Region**: Selecciona la misma región de tu base de datos (ej: `Ohio (US East)`).
    - **Language / Runtime**: Selecciona **Docker**.
-   - **Dockerfile Path**: `backend/Dockerfile`
-   - **Docker Context**: `backend`
+   - **Dockerfile Path**: `Dockerfile` (o `backend/Dockerfile`).
+   - **Docker Context / Build Context**: `.` (dejar por defecto o escribir un punto `.`).
    - **Instance Type**: **Free**
 5. En la sección **Environment Variables**, añade las siguientes variables:
    - `DATABASE_URL` = *(Pega aquí la URL que copiaste de Neon en el Paso 1)*
